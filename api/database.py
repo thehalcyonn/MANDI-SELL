@@ -1,7 +1,15 @@
+import sys
 import os
 import sqlite3
 from typing import Generator
 from contextlib import contextmanager
+
+# Ensure proper path resolution for Vercel Serverless
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+for p in [current_dir, parent_dir]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
 def get_db_path() -> str:
     """
@@ -12,14 +20,25 @@ def get_db_path() -> str:
     if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
         return "/tmp/mandisell.db"
     
-    # Local path
+    # Check if local directory is writable, fallback to /tmp if read-only
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(base_dir, "mandisell.db")
+    local_path = os.path.join(base_dir, "mandisell.db")
+    try:
+        if not os.path.exists(local_path):
+            with open(local_path, "a") as f:
+                pass
+        return local_path
+    except Exception:
+        return "/tmp/mandisell.db"
 
 def get_db_connection() -> sqlite3.Connection:
     """Create and return a configured SQLite connection with dict-like row access."""
     db_path = get_db_path()
-    conn = sqlite3.connect(db_path, check_same_thread=False)
+    try:
+        conn = sqlite3.connect(db_path, check_same_thread=False)
+    except Exception:
+        # Fallback to in-memory if disk is completely restricted
+        conn = sqlite3.connect(":memory:", check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn

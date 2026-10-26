@@ -1,9 +1,17 @@
+import sys
 import os
 from datetime import datetime
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+
+# Ensure both project root and api/ directory are in sys.path for Vercel Serverless
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+for p in [current_dir, parent_dir]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
 from api.database import get_db, init_db
 from api.seed_data import seed_database
@@ -57,6 +65,7 @@ app.add_middleware(
 
 # 1. GET /health
 @app.get("/health", tags=["System"])
+@app.get("/api/health", tags=["System"])
 def get_health():
     """Health check endpoint for uptime monitoring and deployment verification."""
     return {
@@ -70,6 +79,7 @@ def get_health():
 
 # 2. GET /crops
 @app.get("/crops", response_model=List[CropItem], tags=["Master Data"])
+@app.get("/api/crops", response_model=List[CropItem], tags=["Master Data"])
 def get_crops():
     """Returns all supported agricultural commodities with Hindi names and MSP benchmark."""
     init_db()
@@ -82,6 +92,7 @@ def get_crops():
 
 # Helper: GET /districts
 @app.get("/districts", tags=["Master Data"])
+@app.get("/api/districts", tags=["Master Data"])
 def get_districts(crop: Optional[str] = Query(None, description="Filter districts having price records for this crop")):
     """Returns available districts, optionally filtered by crop availability."""
     init_db()
@@ -103,6 +114,7 @@ def get_districts(crop: Optional[str] = Query(None, description="Filter district
 
 # 3. GET /markets
 @app.get("/markets", tags=["Markets & Prices"])
+@app.get("/api/markets", tags=["Markets & Prices"])
 def get_markets(
     crop: str = Query(..., description="Crop name, e.g. Wheat"),
     district: str = Query(..., description="Farmer's base district, e.g. Patiala")
@@ -171,6 +183,7 @@ def get_markets(
 
 # 4. POST /compare
 @app.post("/compare", response_model=CompareResponse, tags=["Calculations & Rankings"])
+@app.post("/api/compare", response_model=CompareResponse, tags=["Calculations & Rankings"])
 def compare_markets(payload: CompareRequest):
     """
     Core Business Logic:
@@ -241,6 +254,7 @@ def compare_markets(payload: CompareRequest):
 
 # 5. GET /prices/trends
 @app.get("/prices/trends", response_model=TrendsResponse, tags=["Historical Trends"])
+@app.get("/api/prices/trends", response_model=TrendsResponse, tags=["Historical Trends"])
 def get_price_trends(crop: str = Query(..., description="Crop name, e.g. Wheat")):
     """
     Returns 30-day historical daily modal prices and arrival volumes for trend analysis.
@@ -303,6 +317,7 @@ def get_price_trends(crop: str = Query(..., description="Crop name, e.g. Wheat")
 
 # 6. GET /data-status
 @app.get("/data-status", response_model=DataStatusResponse, tags=["Data Integrity"])
+@app.get("/api/data-status", response_model=DataStatusResponse, tags=["Data Integrity"])
 def get_data_status():
     """
     Transparency endpoint:

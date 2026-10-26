@@ -1,27 +1,14 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "api/index.py",
-      "use": "@vercel/python"
-    },
-    {
-      "src": "public/**",
-      "use": "@vercel/static"
-    }
-  ],
-  "routes": [
-    { "src": "/health", "dest": "api/index.py" },
-    { "src": "/crops", "dest": "api/index.py" },
-    { "src": "/districts", "dest": "api/index.py" },
-    { "src": "/markets(.*)", "dest": "api/index.py" },
-    { "src": "/compare", "dest": "api/index.py" },
-    { "src": "/prices/(.*)", "dest": "api/index.py" },
-    { "src": "/data-status", "dest": "api/index.py" },
-    { "src": "/docs(.*)", "dest": "api/index.py" },
-    { "src": "/openapi.json", "dest": "api/index.py" },
-    { "src": "/styles.css", "dest": "/public/styles.css" },
-    { "src": "/app.js", "dest": "/public/app.js" },
-    { "src": "/(.*)", "dest": "/public/$1" }
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index.py" },
+    { "source": "/health", "destination": "/api/index.py" },
+    { "source": "/crops", "destination": "/api/index.py" },
+    { "source": "/districts", "destination": "/api/index.py" },
+    { "source": "/markets(.*)", "destination": "/api/index.py" },
+    { "source": "/compare", "destination": "/api/index.py" },
+    { "source": "/prices/(.*)", "destination": "/api/index.py" },
+    { "source": "/data-status", "destination": "/api/index.py" },
+    { "source": "/docs(.*)", "destination": "/api/index.py" },
+    { "source": "/openapi.json", "destination": "/api/index.py" }
   ]
 }
