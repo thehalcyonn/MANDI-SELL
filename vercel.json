@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "public/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    { "src": "/health", "dest": "api/index.py" },
+    { "src": "/crops", "dest": "api/index.py" },
+    { "src": "/districts", "dest": "api/index.py" },
+    { "src": "/markets(.*)", "dest": "api/index.py" },
+    { "src": "/compare", "dest": "api/index.py" },
+    { "src": "/prices/(.*)", "dest": "api/index.py" },
+    { "src": "/data-status", "dest": "api/index.py" },
+    { "src": "/docs(.*)", "dest": "api/index.py" },
+    { "src": "/openapi.json", "dest": "api/index.py" },
+    { "src": "/styles.css", "dest": "/public/styles.css" },
+    { "src": "/app.js", "dest": "/public/app.js" },
+    { "src": "/(.*)", "dest": "/public/$1" }
+  ]
+}

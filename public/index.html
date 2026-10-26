@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MandiSell — Know Your Market. Calculate Your Returns.</title>
+  <meta name="description" content="AgriTech decision tool for farmers. Compare crop prices across mandis, deduct transport and handling expenses, and find the highest net estimated proceeds.">
+  <link rel="stylesheet" href="styles.css">
+  <!-- Chart.js CDN for price trends -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- Top Navigation & Data Integrity Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand">
+        <div class="brand-logo" aria-hidden="true">🌾</div>
+        <div class="brand-text">
+          <span class="brand-title">MandiSell</span>
+          <span class="brand-subtitle">मंडी-सेल &bull; Farmer Returns Calculator</span>
+        </div>
+      </div>
+
+      <div class="header-badges">
+        <button id="data-status-btn" class="pill-badge pill-info" title="Click to view data sources & integrity report">
+          <span class="status-dot"></span>
+          <span id="data-badge-text">Sample Benchmark Feed</span>
+          <span class="info-icon">ℹ️</span>
+        </button>
+        <a href="/docs" target="_blank" class="nav-api-link" title="Open FastAPI Swagger Documentation">API Docs ↗</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Tagline Banner -->
+  <section class="hero-strip">
+    <div class="strip-container">
+      <h1>Know your market. Calculate your returns. Make informed decisions.</h1>
+      <p class="hero-tagline-sub">
+        The highest headline crop price doesn't guarantee the highest earnings. Factor in transport distance, labor, and mandi fees to find your true profit.
+      </p>
+    </div>
+  </section>
+
+  <!-- Main Calculator App Container -->
+  <main class="main-content">
+
+    <!-- Step 1: Input Control Panel -->
+    <section class="calculator-card" aria-labelledby="calc-heading">
+      <div class="card-header">
+        <h2 id="calc-heading">
+          <span class="step-num">1</span>
+          Harvest & Market Details <span class="hindi-sub">(फसल एवं जिला चयन)</span>
+        </h2>
+        <span class="badge-hint">Live Database Driven</span>
+      </div>
+
+      <form id="compare-form" class="calculator-form" novalidate>
+        <div class="form-grid">
+          
+          <!-- Crop Select -->
+          <div class="form-group">
+            <label for="crop-select">
+              Select Crop <span class="hindi-label">(फसल चुनें)</span>
+              <span class="required-star">*</span>
+            </label>
+            <div class="select-wrapper">
+              <select id="crop-select" name="crop" required>
+                <option value="" disabled selected>Loading crops from mandi database...</option>
+              </select>
+            </div>
+            <div id="crop-msp-hint" class="input-hint">MSP Benchmark: <span id="msp-val">—</span></div>
+          </div>
+
+          <!-- District Select -->
+          <div class="form-group">
+            <label for="district-select">
+              Your District <span class="hindi-label">(आपका जिला)</span>
+              <span class="required-star">*</span>
+            </label>
+            <div class="select-wrapper">
+              <select id="district-select" name="district" required>
+                <option value="" disabled selected>Choose your home district...</option>
+              </select>
+            </div>
+            <div class="input-hint">Nearby mandis will be queried based on distance</div>
+          </div>
+
+          <!-- Quantity Input -->
+          <div class="form-group">
+            <label for="quantity-input">
+              Quantity to Sell <span class="hindi-label">(मात्रा - क्विंटल में)</span>
+              <span class="required-star">*</span>
+            </label>
+            <div class="input-with-unit">
+              <input 
+                type="number" 
+                id="quantity-input" 
+                name="quantity" 
+                min="1" 
+                max="20000" 
+                step="0.5" 
+                value="50" 
+                required 
+                placeholder="e.g. 50"
+              >
+              <span class="unit-tag">Quintals (qtl)</span>
+            </div>
+            <!-- Quick preset buttons -->
+            <div class="quick-chips">
+              <span class="chips-label">Quick fill:</span>
+              <button type="button" class="preset-btn" data-qty="25">25 qtl <small>(Mini Pickup)</small></button>
+              <button type="button" class="preset-btn active" data-qty="50">50 qtl <small>(Tractor Trolley)</small></button>
+              <button type="button" class="preset-btn" data-qty="100">100 qtl <small>(Heavy Trolley)</small></button>
+              <button type="button" class="preset-btn" data-qty="250">250 qtl <small>(Truck)</small></button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Form Action -->
+        <div class="form-actions">
+          <button type="submit" id="calculate-btn" class="btn btn-primary">
+            <span class="btn-text">Calculate & Compare Mandis</span>
+            <span class="btn-icon">➔</span>
+          </button>
+          <button type="button" id="reset-btn" class="btn btn-secondary">Reset</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Error / Validation Banner -->
+    <div id="error-banner" class="alert-box alert-error hidden" role="alert">
+      <div class="alert-icon">⚠️</div>
+      <div class="alert-content">
+        <strong id="error-title">Validation Error</strong>
+        <p id="error-message">Please provide valid crop and district selections.</p>
+      </div>
+      <button type="button" class="alert-close" id="error-close-btn">&times;</button>
+    </div>
+
+    <!-- Loading State Skeleton -->
+    <div id="loading-state" class="loading-state hidden">
+      <div class="spinner"></div>
+      <p class="loading-text">Fetching live market quotes & calculating transport deductions...</p>
+    </div>
+
+    <!-- Step 2: Results Display Section -->
+    <section id="results-section" class="results-container hidden" aria-live="polite">
+
+      <!-- The Winner: Best Recommendation Card -->
+      <div class="recommendation-card" id="best-card">
+        <div class="recommendation-badge-strip">
+          <span class="trophy-badge">🏆 HIGHEST ESTIMATED PROCEEDS (सर्वश्रेष्ठ विकल्प)</span>
+          <span class="distance-pill" id="best-distance">6.5 km away</span>
+        </div>
+
+        <div class="recommendation-body">
+          <div class="recommendation-main">
+            <h3 class="mandi-highlight-name" id="best-mandi-name">Patiala Grain Market (APMC)</h3>
+            <div class="mandi-meta" id="best-mandi-location">District Patiala, Punjab &bull; APMC Principal Yard</div>
+
+            <div class="why-box" id="best-why-box">
+              <span class="why-label">💡 Decision Insight:</span>
+              <p id="best-explanation-text">Analyzing market prices...</p>
+            </div>
+          </div>
+
+          <div class="recommendation-figures">
+            <div class="figure-block primary-block">
+              <span class="figure-label">Estimated Net Cash in Hand</span>
+              <span class="figure-sub">(कुल शुद्ध लाभ)</span>
+              <div class="figure-amount" id="best-net-proceeds">₹0</div>
+              <div class="figure-rate" id="best-net-rate">Net ₹0.00 / quintal</div>
+            </div>
+
+            <!-- Difference from 2nd best market -->
+            <div class="advantage-badge" id="advantage-container">
+              <span class="advantage-icon">📈</span>
+              <div class="advantage-text">
+                <strong id="advantage-amount">+₹0</strong>
+                <span id="advantage-sub">more than 2nd place mandi</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Transparent Math Ledger Breakdown -->
+        <div class="ledger-breakdown">
+          <div class="ledger-header">Calculation Breakdown for <span id="ledger-qty">50</span> Quintals:</div>
+          <div class="ledger-grid">
+            <div class="ledger-item">
+              <span class="ledger-title">Gross Market Value</span>
+              <span class="ledger-calc" id="ledger-gross-calc">₹2,360 × 50 qtl</span>
+              <span class="ledger-val positive" id="ledger-gross-val">+₹1,18,000</span>
+            </div>
+            <div class="ledger-item">
+              <span class="ledger-title">Transport Freight</span>
+              <span class="ledger-calc" id="ledger-transport-calc">6.5 km @ ₹3.20/km/qtl</span>
+              <span class="ledger-val negative" id="ledger-transport-val">−₹1,040</span>
+            </div>
+            <div class="ledger-item">
+              <span class="ledger-title">Handling & Market Fee</span>
+              <span class="ledger-calc" id="ledger-other-calc">₹18/qtl + 1.5% cess</span>
+              <span class="ledger-val negative" id="ledger-other-val">−₹2,670</span>
+            </div>
+            <div class="ledger-item total-item">
+              <span class="ledger-title">Net Take-Home Proceeds</span>
+              <span class="ledger-calc">Gross − All Deductions</span>
+              <span class="ledger-val grand-total" id="ledger-net-val">= ₹1,14,290</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Comparison Table Card -->
+      <div class="table-card">
+        <div class="table-header-row">
+          <div>
+            <h3>All Nearby Mandis Ranked by Net Returns</h3>
+            <p class="table-subtext">Click <strong>"Adjust Costs"</strong> on any row to test custom freight or labor rates.</p>
+          </div>
+          <div class="table-actions">
+            <span class="ranked-count" id="ranked-count-badge">4 Markets Evaluated</span>
+          </div>
+        </div>
+
+        <!-- Responsive Comparison Table -->
+        <div class="table-responsive">
+          <table class="mandi-table" id="comparison-table">
+            <thead>
+              <tr>
+                <th scope="col" class="th-rank">Rank</th>
+                <th scope="col">Market Name & Type</th>
+                <th scope="col">Distance</th>
+                <th scope="col">Mandi Price</th>
+                <th scope="col">Transport Cost</th>
+                <th scope="col">Other Expenses</th>
+                <th scope="col" class="th-net">Estimated Proceeds</th>
+                <th scope="col">Net / Quintal</th>
+                <th scope="col">Freshness & Source</th>
+                <th scope="col" class="th-action">Custom Costs</th>
+              </tr>
+            </thead>
+            <tbody id="comparison-table-body">
+              <!-- Dynamically populated rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Step 3: Historical Price Trends Card -->
+      <div class="trends-card" id="trends-container">
+        <div class="trends-header">
+          <div>
+            <h3>
+              30-Day Modal Price Trend &bull; <span id="trends-crop-name">Wheat</span>
+            </h3>
+            <p class="trends-sub">Historical daily benchmark modal prices per quintal (source: Agmarknet feed model)</p>
+          </div>
+          <div class="trend-stats-pills" id="trend-stats">
+            <span class="stat-pill" id="stat-current">Current: ₹—</span>
+            <span class="stat-pill" id="stat-avg">30-Day Avg: ₹—</span>
+            <span class="stat-pill" id="stat-momentum">Momentum: —</span>
+          </div>
+        </div>
+        <div class="chart-wrapper">
+          <canvas id="trendChart" aria-label="30-day crop price trend chart" role="img"></canvas>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Empty State / Fallback -->
+    <div id="empty-state" class="empty-state">
+      <div class="empty-icon">🚜</div>
+      <h3>Ready to calculate your real mandi earnings</h3>
+      <p>Select your crop, home district, and quantity in quintals above to see nearby mandis ranked by net take-home cash.</p>
+    </div>
+
+  </main>
+
+  <!-- Interactive Modal: Custom Cost Adjustments per Mandi -->
+  <div id="cost-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="modal-title">Adjust Selling Costs: <span id="modal-mandi-name">—</span></h3>
+        <button type="button" class="modal-close" id="modal-close-btn">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="modal-desc">
+          Do you have your own tractor, shared vehicle, or negotiated handling rate? Customize the costs below to recalculate your exact proceeds for this market.
+        </p>
+
+        <form id="custom-cost-form">
+          <input type="hidden" id="modal-mandi-id">
+
+          <div class="form-group">
+            <label for="custom-transport-rate">
+              Transport Freight Rate <span class="hindi-label">(परिवहन भाड़ा)</span>
+            </label>
+            <div class="input-with-unit">
+              <input type="number" id="custom-transport-rate" step="0.1" min="0" max="25" required>
+              <span class="unit-tag">₹ / km / quintal</span>
+            </div>
+            <div class="input-hint" id="default-transport-hint">Standard benchmark: ₹3.50/km/qtl</div>
+          </div>
+
+          <div class="form-group">
+            <label for="custom-handling-rate">
+              Labor & Handling Charges <span class="hindi-label">(मजदूरी व तुलाई खर्च)</span>
+            </label>
+            <div class="input-with-unit">
+              <input type="number" id="custom-handling-rate" step="0.5" min="0" max="100" required>
+              <span class="unit-tag">₹ / quintal</span>
+            </div>
+            <div class="input-hint" id="default-handling-hint">Standard benchmark: ₹18.00/qtl</div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" id="modal-reset-btn" class="btn btn-secondary">Restore Defaults</button>
+            <button type="submit" class="btn btn-primary">Apply & Recalculate</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interactive Modal: Data Status & Transparency -->
+  <div id="transparency-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="transparency-title">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="transparency-title">Data Integrity & Government Source Status</h3>
+        <button type="button" class="modal-close" id="transparency-close-btn">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="integrity-alert">
+          <strong>Transparency Notice for Judges & Users:</strong>
+          <p id="transparency-note-text">Loading status...</p>
+        </div>
+
+        <div class="status-metric-grid">
+          <div class="metric-card">
+            <span class="metric-num" id="status-crops-count">—</span>
+            <span class="metric-label">Crops Indexed</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-num" id="status-mandis-count">—</span>
+            <span class="metric-label">Registered Mandis</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-num" id="status-records-count">—</span>
+            <span class="metric-label">Price Records</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-num" id="status-last-update">—</span>
+            <span class="metric-label">Data Timestamp</span>
+          </div>
+        </div>
+
+        <h4 style="margin-top: 18px; margin-bottom: 6px;">How Government Data Integration Works:</h4>
+        <p style="font-size: 0.9rem; color: #4b5563; line-height: 1.5;">
+          MandiSell's backend architecture is designed to interface with the <strong>Open Government Data (OGD) Platform India</strong> (Data.gov.in Agmarknet API) and <strong>e-NAM (National Agriculture Market)</strong> feeds. For hackathon testing and demo stability, realistic benchmark distributions are pre-seeded in SQLite to ensure 100% uptime without external rate-limiting.
+        </p>
+
+        <div class="modal-footer">
+          <button type="button" id="transparency-ok-btn" class="btn btn-primary" style="width: 100%;">Close Report</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <div class="footer-container">
+      <p>
+        <strong>MandiSell</strong> &bull; Built for Srijan Setu AgriTech Hackathon.
+      </p>
+      <p class="footer-tagline">
+        Know your market. Calculate your returns. Make informed decisions.
+      </p>
+      <p class="footer-disclaimer">
+        Prices shown are benchmark quotes for decision support. Actual prices are subject to physical quality inspection, moisture content, and market bidding.
+      </p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
